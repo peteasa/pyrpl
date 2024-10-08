@@ -319,6 +319,7 @@ class RedPitaya(object):
         self.ssh.ask('systemctl stop redpitaya_nginx') # for 0.94 and higher
         sleep(3) # sleep after stopping service
         result = self.ssh.ask('cat /root/.version')
+        self.logger.info('cat /root/.version: {}'.format(result))
         if result.find('2.') != -1:
             self.ssh.ask('/opt/redpitaya/sbin/overlay.sh pyrpl')
             sleep(1)
@@ -327,6 +328,7 @@ class RedPitaya(object):
                 + os.path.join(self.parameters['serverdirname'], self.parameters['serverbinfilename'])
                 + ' > //dev//xdevcfg')
         sleep(self.parameters['delay'])
+        self.logger.info('About to restart the redpitaya service')
         self.ssh.ask('rm -f '+ os.path.join(self.parameters['serverdirname'], self.parameters['serverbinfilename']))
         self.ssh.ask("nginx -p //opt//www//")
         self.ssh.ask('systemctl start redpitaya_nginx')  # for 0.94 and higher #needs test
@@ -335,10 +337,17 @@ class RedPitaya(object):
 
     def fpgarecentlyflashed(self):
         self.ssh.ask()
-        result =self.ssh.ask("echo $(($(date +%s) - $(date +%s -r \""
-        + os.path.join(self.parameters['serverdirname'], self.parameters['serverbinfilename']) +"\")))")
+        result = self.ssh.ask('cat /root/.version')
+        if result.find('2.') != -1:
+            result = self.ssh.ask("echo $(($(date +%s) - $(date +%s -r \""
+                                  + "//opt//redpitaya//fpga//z10_125//pyrpl//fpga.bit.bin" +"\")))")
+            result = result.replace('\r', os.linesep)
+            self.logger.info('fpga age result: {}'.format(result.split(os.linesep)))
+        else:
+            result = self.ssh.ask("echo $(($(date +%s) - $(date +%s -r \""
+                                  + os.path.join(self.parameters['serverdirname'], self.parameters['serverbinfilename']) +"\")))")
         age = None
-        for line in result.split('\n'):
+        for line in result.split(os.linesep):
             try:
                 age = int(line.strip())
             except:
@@ -365,7 +374,7 @@ class RedPitaya(object):
         sleep(self.parameters['delay'])
         self.ssh.ask("cd " + self.parameters['serverdirname'])
         #try both versions
-        for serverfile in ['monitor_server','monitor_server_0.95']:
+        for serverfile in ['monitor_server', 'monitor_server_0.95']:
             sleep(self.parameters['delay'])
             try:
                 self.ssh.scp.put(
