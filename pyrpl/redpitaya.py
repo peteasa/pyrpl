@@ -279,11 +279,16 @@ class RedPitaya(object):
         sleep(self.parameters['delay'])
 
     def update_fpga(self, filename=None):
+        # For version 2.0 and higher to load a custom fpga use the update_fpga.sh script
+        update_cmd = '{} pyrpl'.format(
+            os.path.join(self.parameters['serverdirname'],
+                         'update_fpga.sh'))
         if filename is None:
             try:
                 source = self.parameters['filename']
             except KeyError:
                 source = None
+
         self.end()
         sleep(self.parameters['delay'])
         self.ssh.ask('rw')
@@ -292,9 +297,15 @@ class RedPitaya(object):
         sleep(self.parameters['delay'])
         if source is None or not os.path.isfile(source):
             if source is not None:
-                self.logger.warning('Desired bitfile "%s" does not exist. Using default file.',
+                self.logger.warning('Desired bitfile "%s" does not exist. Using default installation.',
                                     source)
+
+            # prior to version 2.0 fpga default is to use the default pyrpl fpga
             source = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'fpga', 'red_pitaya.bin')
+
+            # For version 2.0 fpga and higher the default is to use pyrpl fpga from redpitaya
+            update_cmd = '/opt/redpitaya/sbin/overlay.sh pyrpl'
+
         if not os.path.isfile(source):
             raise IOError("Wrong filename",
               "The fpga bitfile was not found at the expected location. Try passing the arguments "
@@ -304,24 +315,50 @@ class RedPitaya(object):
               " current filename: "+self.parameters['filename'])
         for i in range(3):
             try:
-                self.ssh.scp.put(source,
-                             os.path.join(self.parameters['serverdirname'],
-                                          self.parameters['serverbinfilename']))
+                self.ssh.scp.put(
+                    os.path.join(
+                        os.path.abspath(os.path.dirname(__file__)), 'update_fpga.sh'),
+                    os.path.join(self.parameters['serverdirname'], 'update_fpga.sh'))
             except (SCPException, SSHException):
                 # try again before failing
                 self.start_ssh()
                 sleep(self.parameters['delay'])
             else:
                 break
+        for i in range(3):
+            try:
+                self.ssh.scp.put(
+                    source,
+                    os.path.join(self.parameters['serverdirname'],
+                                 self.parameters['serverbinfilename']))
+            except (SCPException, SSHException):
+                # try again before failing
+                self.start_ssh()
+                sleep(self.parameters['delay'])
+            else:
+                break
+
         # kill all other servers to prevent reading while fpga is flashed
         self.end()
         self.ssh.ask('killall nginx')
         self.ssh.ask('systemctl stop redpitaya_nginx') # for 0.94 and higher
-        self.ssh.ask('cat '
-                 + os.path.join(self.parameters['serverdirname'], self.parameters['serverbinfilename'])
-                 + ' > //dev//xdevcfg')
+        sleep(3) # sleep after stopping service
+        result = self.ssh.ask('cat /root/.version')
+        self.logger.debug('cat /root/.version: {}'.format(result))
+        if result.find('2.') != -1:
+            self.ssh.ask(update_cmd)
+            sleep(1)
+        else:
+            self.ssh.ask('cat '
+                         + os.path.join(self.parameters['serverdirname'], self.parameters['serverbinfilename'])
+                         + ' > //dev//xdevcfg')
+
         sleep(self.parameters['delay'])
-        self.ssh.ask('rm -f '+ os.path.join(self.parameters['serverdirname'], self.parameters['serverbinfilename']))
+        self.logger.debug('About to restart the redpitaya service')
+        self.ssh.ask('rm -f '+ os.path.join(
+            self.parameters['serverdirname'], self.parameters['serverbinfilename']))
+        self.ssh.ask('rm -f '+ os.path.join(
+            self.parameters['serverdirname'], 'update_fpga.sh'))
         self.ssh.ask("nginx -p //opt//www//")
         self.ssh.ask('systemctl start redpitaya_nginx')  # for 0.94 and higher #needs test
         sleep(self.parameters['delay'])
@@ -329,10 +366,17 @@ class RedPitaya(object):
 
     def fpgarecentlyflashed(self):
         self.ssh.ask()
-        result =self.ssh.ask("echo $(($(date +%s) - $(date +%s -r \""
-        + os.path.join(self.parameters['serverdirname'], self.parameters['serverbinfilename']) +"\")))")
+        result = self.ssh.ask('cat /root/.version')
+        if result.find('2.') != -1:
+            result = self.ssh.ask("echo $(($(date +%s) - $(date +%s -r \""
+                                  + "//opt//redpitaya//fpga//z10_125//pyrpl//fpga.bit.bin" +"\")))")
+            result = result.replace('\r', os.linesep)
+            self.logger.debug('fpga age result: {}'.format(result.split(os.linesep)))
+        else:
+            result = self.ssh.ask("echo $(($(date +%s) - $(date +%s -r \""
+                                  + os.path.join(self.parameters['serverdirname'], self.parameters['serverbinfilename']) +"\")))")
         age = None
-        for line in result.split('\n'):
+        for line in result.split(os.linesep):
             try:
                 age = int(line.strip())
             except:
