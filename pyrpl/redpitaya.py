@@ -376,7 +376,7 @@ class RedPitaya(object):
             result = self.ssh.ask("echo $(($(date +%s) - $(date +%s -r \""
                                   + os.path.join(self.parameters['serverdirname'], self.parameters['serverbinfilename']) +"\")))")
         age = None
-        for line in result.split(os.linesep):
+        for line in result.split('\n'):
             try:
                 age = int(line.strip())
             except:
