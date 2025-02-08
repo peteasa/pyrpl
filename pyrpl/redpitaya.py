@@ -51,8 +51,8 @@ defaultparameters = dict(
     delay=0.05,  # delay between ssh commands - console is too slow otherwise
     autostart=True,  # autostart the client?
     reloadserver=False,  # reinstall the server at startup if not necessary?
-    reloadfpga=True,  # reload the fpga bitfile at startup?
-    serverbinfilename='fpga.bin',  # name of the binfile on the server
+    reloadfpga=True,  # reload the fpga binfile at startup?
+    serverbinfilename='fpga.bit.bin',  # name of the binfile on the server
     serverdirname = "//opt//pyrpl//",  # server directory for server app and bitfile
     leds_off=True,  # turn off all GPIO lets at startup (improves analog performance)
     frequency_correction=1.0,  # actual FPGA frequency is 125 MHz * frequency_correction
@@ -90,8 +90,8 @@ class RedPitaya(object):
             autostart=True,  # autostart the client?
             reloadserver=False,  # reinstall the server at startup if not necessary?
             reloadfpga=True,  # reload the fpga bitfile at startup?
-            filename='fpga//red_pitaya.bin',  # name of the bitfile for the fpga, None is default file
-            serverbinfilename='fpga.bin',  # name of the binfile on the server
+            filename='fpga//red_pitaya.bin',  # name of the binfile for the fpga, None is default file
+            serverbinfilename='fpga.bit.bin',  # name of the binfile on the server
             serverdirname = "//opt//pyrpl//",  # server directory for server app and bitfile
             leds_off=True,  # turn off all GPIO lets at startup (improves analog performance)
             frequency_correction=1.0,  # actual FPGA frequency is 125 MHz * frequency_correction
@@ -278,16 +278,31 @@ class RedPitaya(object):
             str(gpiopin) + "/value")
         sleep(self.parameters['delay'])
 
+    def put_file(self, source, destination):
+        for i in range(3):
+            try:
+                self.ssh.scp.put(source, destination)
+            except (SCPException, SSHException):
+                # try again before failing
+                self.start_ssh()
+                sleep(self.parameters['delay'])
+            else:
+                break
+
     def update_fpga(self, filename=None):
-        # For version 2.0 and higher to load a custom fpga use the update_fpga.sh script
+        # For version 2.0 and higher to load a custom fpga uses the update_fpga.sh script
+        update_custom = ''
         update_cmd = '{} pyrpl'.format(
             os.path.join(self.parameters['serverdirname'],
                          'update_fpga.sh'))
         if filename is None:
-            try:
+            if 'filename' in self.parameters and not self.parameters['filename'] is None:
                 source = self.parameters['filename']
-            except KeyError:
+            else:
                 source = None
+
+        if not source is None and os.path.isfile(source):
+            update_custom = 'custom'
 
         self.end()
         sleep(self.parameters['delay'])
@@ -297,46 +312,30 @@ class RedPitaya(object):
         sleep(self.parameters['delay'])
         if source is None or not os.path.isfile(source):
             if source is not None:
-                self.logger.warning('Desired bitfile "%s" does not exist. Using default installation.',
+                self.logger.warning('Desired binfile "%s" does not exist. Using default installation.',
                                     source)
 
             # prior to version 2.0 fpga default is to use the default pyrpl fpga
             source = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'fpga', 'red_pitaya.bin')
 
-            # For version 2.0 fpga and higher the default is to use pyrpl fpga from redpitaya
-            update_cmd = '/opt/redpitaya/sbin/overlay.sh pyrpl'
+            # after version 2.0 fpga default is to use the RedPitaya pyrpl fpga
+            update_custom = ''
 
         if not os.path.isfile(source):
             raise IOError("Wrong filename",
-              "The fpga bitfile was not found at the expected location. Try passing the arguments "
-              "dirname=\"c://github//pyrpl//pyrpl//\" adapted to your installation directory of pyrpl "
-              "and filename=\"red_pitaya.bin\"! Current dirname: "
-              + self.parameters['dirname'] +
-              " current filename: "+self.parameters['filename'])
-        for i in range(3):
-            try:
-                self.ssh.scp.put(
-                    os.path.join(
-                        os.path.abspath(os.path.dirname(__file__)), 'update_fpga.sh'),
-                    os.path.join(self.parameters['serverdirname'], 'update_fpga.sh'))
-            except (SCPException, SSHException):
-                # try again before failing
-                self.start_ssh()
-                sleep(self.parameters['delay'])
-            else:
-                break
-        for i in range(3):
-            try:
-                self.ssh.scp.put(
-                    source,
-                    os.path.join(self.parameters['serverdirname'],
-                                 self.parameters['serverbinfilename']))
-            except (SCPException, SSHException):
-                # try again before failing
-                self.start_ssh()
-                sleep(self.parameters['delay'])
-            else:
-                break
+                "The fpga binfile was not found at the expected location. Try passing the arguments "
+                "filename=\"c://github//pyrpl//pyrpl//red_pitaya.bin\" adapted to your installation "
+                "directory of pyrpl: current filename: "+self.parameters['filename'])
+
+        # send update_fpga.sh to mark start of update process
+        self.put_file(
+            os.path.join(os.path.abspath(os.path.dirname(__file__)), 'update_fpga.sh'),
+            os.path.join(self.parameters['serverdirname'], 'update_fpga.sh'))
+        # send binfile
+        self.put_file(source, os.path.join(self.parameters['serverdirname'],
+                                           self.parameters['serverbinfilename']))
+        # add appropriate parameters to the update command line
+        update_cmd = '{} {}'.format(update_cmd, update_custom)
 
         # kill all other servers to prevent reading while fpga is flashed
         self.end()
@@ -360,21 +359,21 @@ class RedPitaya(object):
         self.ssh.ask('rm -f '+ os.path.join(
             self.parameters['serverdirname'], 'update_fpga.sh'))
         self.ssh.ask("nginx -p //opt//www//")
-        self.ssh.ask('systemctl start redpitaya_nginx')  # for 0.94 and higher #needs test
+        self.ssh.ask('systemctl start redpitaya_nginx')  # for 0.94 and higher
         sleep(self.parameters['delay'])
         self.ssh.ask('ro')
 
+    def fpgaupdateinprogress(self):
+        self.ssh.ask()
+        result = self.ssh.ask('wc {}'.format(os.path.join(self.parameters['serverdirname'], 'update_fpga.sh')))
+        self.logger.debug('wc update_fpga.sh {}'.format(result))
+
+        return result.find('No such file or directory') < 0
+
     def fpgarecentlyflashed(self):
         self.ssh.ask()
-        result = self.ssh.ask('cat /root/.version')
-        if result.find('2.') != -1:
-            result = self.ssh.ask("echo $(($(date +%s) - $(date +%s -r \""
-                                  + "//opt//redpitaya//fpga//z10_125//pyrpl//fpga.bit.bin" +"\")))")
-            result = result.replace('\r', os.linesep)
-            self.logger.debug('fpga age result: {}'.format(result.split(os.linesep)))
-        else:
-            result = self.ssh.ask("echo $(($(date +%s) - $(date +%s -r \""
-                                  + os.path.join(self.parameters['serverdirname'], self.parameters['serverbinfilename']) +"\")))")
+        result =self.ssh.ask("echo $(($(date +%s) - $(date +%s -r \""
+        + os.path.join(self.parameters['serverdirname'], self.parameters['serverbinfilename']) +"\")))")
         age = None
         for line in result.split('\n'):
             try:
@@ -437,7 +436,7 @@ class RedPitaya(object):
     def startserver(self):
         self.endserver()
         sleep(self.parameters['delay'])
-        if self.fpgarecentlyflashed():
+        if self.fpgaupdateinprogress():
             self.logger.info("FPGA is being flashed. Please wait for 2 "
                             "seconds.")
             sleep(2.0)
