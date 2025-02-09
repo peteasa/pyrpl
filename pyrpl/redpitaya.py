@@ -53,6 +53,7 @@ defaultparameters = dict(
     reloadserver=False,  # reinstall the server at startup if not necessary?
     reloadfpga=True,  # reload the fpga binfile at startup?
     serverbinfilename='fpga.bit.bin',  # name of the binfile on the server
+    serverdtbofilename='fpga.dtbo',  # name of the device tree overlay file on the server
     serverdirname = "//opt//pyrpl//",  # server directory for server app and bitfile
     leds_off=True,  # turn off all GPIO lets at startup (improves analog performance)
     frequency_correction=1.0,  # actual FPGA frequency is 125 MHz * frequency_correction
@@ -91,7 +92,9 @@ class RedPitaya(object):
             reloadserver=False,  # reinstall the server at startup if not necessary?
             reloadfpga=True,  # reload the fpga bitfile at startup?
             filename='fpga//red_pitaya.bin',  # name of the binfile for the fpga, None is default file
+            dtbo_filename='fpga//red_pitaya.dtbo', # name of device tree file, None is the default
             serverbinfilename='fpga.bit.bin',  # name of the binfile on the server
+            serverdtbofilename='fpga.dtbo',  # name of the device tree overlay file on the server
             serverdirname = "//opt//pyrpl//",  # server directory for server app and bitfile
             leds_off=True,  # turn off all GPIO lets at startup (improves analog performance)
             frequency_correction=1.0,  # actual FPGA frequency is 125 MHz * frequency_correction
@@ -334,6 +337,18 @@ class RedPitaya(object):
         # send binfile
         self.put_file(source, os.path.join(self.parameters['serverdirname'],
                                            self.parameters['serverbinfilename']))
+        if 0 < len(update_custom) and 'dtbo_filename' in self.parameters and not self.parameters['dtbo_filename'] is None:
+            # send device tree
+            update_custom = '{} dtbo'.format(update_custom)
+            if not os.path.isfile(self.parameters['dtbo_filename']):
+                raise IOError("Wrong device tree filename",
+                  "The fpga device tree was not found at the expected location. Try passing the arguments "
+                  "dtbo_filename=\"c://github//pyrpl//pyrpl//red_pitaya.dtbo\" adapted to your installation "
+                  "directory of pyrpl: current filename: "+self.parameters['dtbo_filename'])
+            self.put_file(self.parameters['dtbo_filename'],
+                          os.path.join(self.parameters['serverdirname'],
+                                       self.parameters['serverdtbofilename']))
+
         # add appropriate parameters to the update command line
         update_cmd = '{} {}'.format(update_cmd, update_custom)
 
@@ -354,6 +369,8 @@ class RedPitaya(object):
 
         sleep(self.parameters['delay'])
         self.logger.debug('About to restart the redpitaya service')
+        self.ssh.ask('rm -f '+ os.path.join(
+            self.parameters['serverdirname'], self.parameters['serverdtbofilename']))
         self.ssh.ask('rm -f '+ os.path.join(
             self.parameters['serverdirname'], self.parameters['serverbinfilename']))
         self.ssh.ask('rm -f '+ os.path.join(
