@@ -15,7 +15,10 @@
 
 # Build process
 
-Update the part number and sdc file specific to your target board in `fpga/red_pitaya_vivado.tcl`
+> [!NOTE]
+> First consider using the fpga build scripts in [RedPitaya/Makefile.x86](https://github.com/RedPitaya/RedPitaya/blob/master/Makefile.x86) that supports all the different RedPitaya board types using the [RedPitaya-FPGA](https://github.com/RedPitaya/RedPitaya-FPGA) hdl code rather than this fpga build.
+
+Assuming you have a specific requirement to use this hdl code rather than the RedPitaya-FPGA hdl code in your design make sure that you update the part number and constraints sdc file specific to your target board in `fpga/red_pitaya_vivado.tcl`
 ```
 set part xc7z010clg400-1
 read_xdc                          $path_sdc/red_pitaya.xdc
@@ -33,22 +36,22 @@ set scripts_vivado_version 2023.2
 
 The default mode for building the FPGA is to run a TCL script inside Vivado. Non project mode is used, to avoid the generation of project files, which are too many and difficult to handle. This allows us to only place source files and scripts under version control.
 
-The next scripts perform various tasks:
+The next scripts perform various tasks for the xc7z010clg400-1 part:
 
 | TCL script                      | action
 |---------------------------------|---------------------------------------------
 | `red_pitaya_vivado_project.tcl` | creates a Vivado project for graphical editing
 | `red_pitaya_vivado.tcl`         | creates the bitstream and reports
 
-To generate a redpitaya.bin file, redpitaya.dtbo device tree, reports, run these two commands:
+To generate a redpitaya.bin file for the xc7z010clg400-1 part, redpitaya.dtbo device tree, reports, run these two commands:
 ```bash
 source /opt/Xilinx/Vivado/2023.2/settings64.sh
 make
 ```
 
 # Device tree
-
-You do not need to build the .bin file or the device tree to use Pyrpl.  They are provided pre-built.
+> [!NOTE]
+> You do not need to build the .bin file or the device tree to use Pyrpl.  They are provided pre-built.
 
 Device tree is used by Linux to describe features and address space of memory mapped hardware attached to the CPU.  It can (optionally) be installed onto the RedPitaya board with the redpitaya.bin file generated (specify the full path to the files).  In this example assuming the generated .bin and .dtbo files are in the same directory as the python code:
 ```
