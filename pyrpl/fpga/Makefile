@@ -9,7 +9,7 @@
 VIVADO_VER := $(shell vivado -version | head -n 1 | sed -e 's/ (/_/g' | sed -e 's/ /_/g' | sed -e 's/)//g')
 
 PARENT  = ../../..
-VITIS_VER = 2023.2
+VITIS_VER = 2024.2
 DTG     = $(PARENT)/device-tree-xlnx-xilinx-v$(VITIS_VER)
 
 # Red Pitaya FPGA repo
