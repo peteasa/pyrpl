@@ -790,6 +790,7 @@ class FilterRegister(BaseRegister, FilterProperty):
         divider = float(self._MINBW(obj))
 
         if divider == 0:
+            obj._logger.info("FilterRegister: module %s of type %s found _MINBW: %f", str(obj), type(obj), self._MINBW(obj))
             return clog2(125000000.0/10) # some default value to stop error, see issue #505
         else:
             return clog2(125000000.0/divider)
