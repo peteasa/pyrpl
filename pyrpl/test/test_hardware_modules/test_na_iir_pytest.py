@@ -6,7 +6,7 @@ from pyrpl.test.test_base import TestPyrpl
 
 
 class TestIir(TestPyrpl):
-    def setup(self):
+    def setup_method(self):
         self.extradelay = 0.6 * 8e-9  # no idea where this delay comes from
         # shortcuts
         self.pyrpl.na = self.pyrpl.networkanalyzer
@@ -15,7 +15,7 @@ class TestIir(TestPyrpl):
         self.loglevel = self.na._logger.getEffectiveLevel()
         self.na._logger.setLevel(10)
 
-    def teardown(self):
+    def teardown_method(self):
         self.na.stop()
         # set na loglevel to previous one
         self.na._logger.setLevel(self.loglevel)

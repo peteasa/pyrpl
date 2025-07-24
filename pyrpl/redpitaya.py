@@ -293,11 +293,9 @@ class RedPitaya(object):
                 break
 
     def update_fpga(self, filename=None):
-        # For version 2.0 and higher to load a custom fpga uses the update_fpga.sh script
+        # For version 2.07 and higher to load a custom fpga use overlay.sh script
         update_custom = ''
-        update_cmd = '//usr//bin//sh {} pyrpl'.format(
-            os.path.join(self.parameters['serverdirname'],
-                         'update_fpga.sh'))
+        update_cmd = '//opt//redpitaya//sbin//overlay.sh pyrpl'
         if filename is None:
             if 'filename' in self.parameters and not self.parameters['filename'] is None:
                 source = self.parameters['filename']
@@ -333,10 +331,6 @@ class RedPitaya(object):
                 "filename=\"c://github//pyrpl//pyrpl//red_pitaya.bin\" adapted to your installation "
                 "directory of pyrpl: current filename: "+self.parameters['filename'])
 
-        # send update_fpga.sh to mark start of update process
-        self.put_file(
-            os.path.join(os.path.abspath(os.path.dirname(__file__)), 'update_fpga.sh'),
-            os.path.join(self.parameters['serverdirname'], 'update_fpga.sh'))
         # send binfile
         self.put_file(source, os.path.join(self.parameters['serverdirname'],
                                            self.parameters['serverbinfilename']))

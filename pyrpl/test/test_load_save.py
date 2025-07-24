@@ -78,20 +78,20 @@ class TestLoadSave(TestPyrpl):
     attributes are the ones that were saved
     """
 
-    def test_load_save(self):
-        for mod in self.pyrpl.modules:
-            #for exclude in [Lockbox, Scope]: # scope has an unknown bug
-            # here (nosetests freezes at a  later time)
-            for exclude in [Lockbox]:  # lockbox is tested elsewhere
-                if isinstance(mod, exclude):
-                    break
-            else:
-                yield self.assert_load_save_module, mod
-                # make sure all modules are stopped at the end of this test
-                try:
-                    mod.stop()
-                except:
-                    pass
+    # def test_load_save(self):
+    #     for mod in self.pyrpl.modules:
+    #         #for exclude in [Lockbox, Scope]: # scope has an unknown bug
+    #         # here (nosetests freezes at a  later time)
+    #         for exclude in [Lockbox]:  # lockbox is tested elsewhere
+    #             if isinstance(mod, exclude):
+    #                 break
+    #         else:
+    #             yield self.assert_load_save_module, mod
+    #             # make sure all modules are stopped at the end of this test
+    #             try:
+    #                 mod.stop()
+    #             except:
+    #                 pass
 
     def test_load_save_pytest(self):
         # same test as above but without the yield not supported by pytest, 

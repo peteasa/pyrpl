@@ -22,7 +22,7 @@ class TestPyqtgraph(TestRedpitaya):
     REDPITAYA = False  # REDPITAYA=True tests the speed with Red Pitaya Scope
     timeout = 10.0  # timeout if the gui never plots anything
 
-    def setup(self):
+    def setup_method(self):
         self.t0 = np.linspace(0, self.duration, self.N)
         self.plotWidget = pg.plot(title="Realtime plotting benchmark")
         self.cycle = 0
@@ -34,7 +34,7 @@ class TestPyqtgraph(TestRedpitaya):
         self.timer.timeout.connect(self.update_plot)
         self.timer.start()
 
-    def teardown(self):
+    def teardown_method(self):
         self.timer.stop()
         APP.processEvents()
         self.plotWidget.close()
